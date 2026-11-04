@@ -59,6 +59,12 @@ for (const svc of SERVICES) {
   for (const pg of [first, ...rest]) for (const s of pg.results) if (!found.has(s.id)) found.set(s.id, s);
   const list = [...found.values()];
   await pool(list, 8, async (s) => { s.imdb = await imdbOf(s.id); });
+  // newest episode first: shows still on air come before ones that ended long ago (TMDB cannot sort discover by this, so look each one up)
+  await pool(list, 8, async (s) => {
+    const d = await api(`/tv/${s.id}?language=en-GB`);
+    s.latest = [d.last_episode_to_air?.air_date, d.last_air_date, d.first_air_date].filter(Boolean).sort().pop() || '';
+  });
+  list.sort((a, b) => (b.latest || '').localeCompare(a.latest || '') || b.popularity - a.popularity);
   const shows = list.filter((s) => s.imdb).map((s) => ({
     meta: { id: s.imdb, type: 'series', name: s.name, releaseInfo: (s.first_air_date || '').slice(0, 4), poster: `https://images.metahub.space/poster/medium/${s.imdb}/img` },
     genres: [...new Set((s.genre_ids || []).map((g) => CATEGORY[g]).filter(Boolean))],
@@ -82,7 +88,7 @@ for (const svc of SERVICES) {
 fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 0));
 const manifest = {
   id: 'com.hertn.uktv', version: '1.0.0', name: "Hert's UK TV",
-  description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and Dave / UKTV, sorted by genre. Updated weekly.',
+  description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and Dave / UKTV, sorted by genre, newest episodes first. Updated weekly.',
   resources: ['catalog'], types: ['series'], catalogs: manifestCatalogs, idPrefixes: ['tt'],
   logo: 'https://hertn.github.io/uk-tv-list/icon.svg', background: undefined,
 };
