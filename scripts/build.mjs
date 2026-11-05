@@ -121,6 +121,9 @@ async function viaTMDB(svc) {
   return list;                                             // ITVX: TMDB's UK provider list as it is
 }
 
+// Shows a service carries but its data source leaves out; added by title (still checked as UK-made, resolved through TMDB).
+const EXTRAS = { itvx: ['Coronation Street'] };
+
 const sources = { bbc: scrapeBBC, ch4: scrapeC4, udave: scrapeU };
 const perService = {};
 for (const svc of SERVICES) {
@@ -134,6 +137,10 @@ for (const svc of SERVICES) {
     shows = [...byId.values()];
     console.log(`${svc.name}: ${shows.length} matched to TMDB; unmatched e.g. ${titles.filter((t, i) => !hits[i]).slice(0, 8).join(' | ')}`);
   } else shows = await viaTMDB(svc);
+  for (const t of EXTRAS[svc.id] || []) {
+    const h = await resolveTitle(t);
+    if (h && !shows.some((x) => x.id === h.id)) shows.push(h); else if (!h) console.log(`EXTRAS: could not find "${t}" on TMDB`);
+  }
   perService[svc.id] = shows;
 }
 fs.writeFileSync(titleFile, JSON.stringify(titleCache));
