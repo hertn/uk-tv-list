@@ -6,7 +6,7 @@ import path from 'node:path';
 const TOKEN = process.env.TMDB_TOKEN;
 if (!TOKEN) { console.error('Set TMDB_TOKEN to your TMDB API Read Access Token'); process.exit(1); }
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const PAGE = 100;                    // shows per Stremio page
+const PAGE = 2000;                   // shows per Stremio page: big, so a whole catalog loads at once and the browser search (Cmd-F) can find everything
 const MIN_VOTES = 20;                // drops obscure / one-off entries
 
 // TMDB watch-provider ids for the UK (watch_region=GB)
