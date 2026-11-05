@@ -67,6 +67,7 @@
       "Drama",
       "Comedy",
       "Crime & Mystery",
+      "Documentary",
       "Action & Adventure",
       "Reality & Lifestyle",
       "Sci-Fi & Fantasy",
@@ -86,6 +87,7 @@
     "Drama",
     "Comedy",
     "Crime & Mystery",
+    "Documentary",
     "Action & Adventure",
     "Reality & Lifestyle",
     "Sci-Fi & Fantasy",
@@ -151,7 +153,6 @@
     {
      "name": "genre",
      "options": [
-      "Kids & Animation",
       "Drama",
       "Comedy",
       "Crime & Mystery",
@@ -171,7 +172,6 @@
     }
    ],
    "genres": [
-    "Kids & Animation",
     "Drama",
     "Comedy",
     "Crime & Mystery",
