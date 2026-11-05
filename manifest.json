@@ -1,8 +1,8 @@
 {
  "id": "com.hertn.uktv",
- "version": "1.2.3",
+ "version": "1.2.4",
  "name": "Hert's UK TV",
- "description": "UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly.",
+ "description": "UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly (last build 2026-11-05).",
  "resources": [
   "catalog"
  ],
