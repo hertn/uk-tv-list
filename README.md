@@ -27,9 +27,9 @@ Posters, descriptions and episodes come from Stremio's built-in Cinemeta and you
 
 ## How it stays up to date
 
-A GitHub Action runs every Monday. It asks [TMDB](https://www.themoviedb.org) which UK-made shows are available on each service in the UK, looks up their IMDb ids, and rewrites the catalog files. Stremio picks up the changes on its own.
+A GitHub Action runs every Monday. For BBC iPlayer, Channel 4 and U&Dave it reads each service's own A-Z / all-shows pages; for ITVX it asks [TMDB](https://www.themoviedb.org) which UK-made shows ITVX carries. UK-made shows are matched to their IMDb ids through TMDB, and the catalog files are rewritten. Stremio picks up the changes on its own.
 
-Availability data comes from TMDB (powered by JustWatch) and can lag behind the services or occasionally be wrong. This product uses the TMDB API but is not endorsed or certified by TMDB.
+ITVX availability comes from TMDB (powered by JustWatch) and can lag behind the service or occasionally be wrong. This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 ## Support
 
