@@ -154,13 +154,21 @@ await pool(everything, 8, async (s) => {
   s.latest = [d.last_episode_to_air?.air_date, d.last_air_date, d.first_air_date].filter(Boolean).sort().pop() || '';
 });
 
+// TMDB tags many shows with several genres (Jonathan Creek: Comedy + Crime + Drama). Keep the most specific ones so a detective show
+// is not listed under Comedy: Drama is only used when nothing else fits, and Comedy steps aside for Crime & Mystery.
+const tidyGenres = (g) => {
+  if (g.includes('Crime & Mystery')) g = g.filter((x) => x !== 'Comedy');
+  if (g.length > 1) g = g.filter((x) => x !== 'Drama');
+  return g;
+};
+
 const manifestCatalogs = [], allGenres = new Set(), report = [];
 for (const svc of SERVICES) {
   const list = perService[svc.id];
   list.sort((a, b) => (b.latest || '').localeCompare(a.latest || '') || b.popularity - a.popularity);
   const shows = list.filter((s) => s.imdb).map((s) => ({
     meta: { id: s.imdb, type: 'series', name: s.name, releaseInfo: (s.first_air_date || '').slice(0, 4), poster: `https://images.metahub.space/poster/medium/${s.imdb}/img` },
-    genres: [...new Set((s.genre_ids || []).map((g) => CATEGORY[g]).filter(Boolean))],
+    genres: tidyGenres([...new Set((s.genre_ids || []).map((g) => CATEGORY[g]).filter(Boolean))]),
   }));
   const genres = Object.values(CATEGORY).filter((g, i, a) => a.indexOf(g) === i).filter((g) => shows.some((s) => s.genres.includes(g)));
   genres.forEach((g) => allGenres.add(g));
