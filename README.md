@@ -4,7 +4,7 @@
 
 <h1 align="center">Hert's UK TV</h1>
 
-<p align="center">UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and Dave / UKTV, for Stremio. Sorted by genre, updated every week.</p>
+<p align="center">UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, for Stremio. Sorted by genre, updated every week.</p>
 
 <p align="center">
   <a href="https://web.stremio.com/#/addons?addon=https%3A%2F%2Fhertn.github.io%2Fuk-tv-list%2Fmanifest.json"><img src="https://img.shields.io/badge/install-in%20Stremio-7b5cf0?style=flat&amp;labelColor=15181e" alt="Install in Stremio"></a>
@@ -21,7 +21,7 @@ https://hertn.github.io/uk-tv-list/manifest.json
 
 ## Use
 
-Open **Discover**, choose **Series**, then pick a catalog from the dropdown: **BBC iPlayer**, **ITVX**, **Channel 4** or **Dave / UKTV**. Each one has a genre filter (Crime & Mystery, Drama, Comedy, Soaps, Sci-Fi & Fantasy, Documentary, Reality & Lifestyle, Talk & Panel, Kids & Animation, Action & Adventure, War & History).
+Open **Discover**, choose **Series**, then pick a catalog from the dropdown: **BBC iPlayer**, **ITVX**, **Channel 4** or **U&Dave**. Each one has a genre filter (Crime & Mystery, Drama, Comedy, Soaps, Sci-Fi & Fantasy, Documentary, Reality & Lifestyle, Talk & Panel, Kids & Animation, Action & Adventure, War & History).
 
 Posters, descriptions and episodes come from Stremio's built-in Cinemeta and your own stream addons. This addon only lists the shows.
 
