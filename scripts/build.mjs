@@ -111,18 +111,14 @@ const resolveTitle = async (title) => {
 };
 
 async function viaTMDB(svc) {
-  const base = `/discover/tv?watch_region=GB&with_watch_providers=${svc.providers.join('|')}&with_origin_country=GB&sort_by=popularity.desc&vote_count.gte=5&language=en-GB`;
+  const base = `/discover/tv?watch_region=GB&with_watch_providers=${svc.providers.join('|')}&with_origin_country=GB&sort_by=popularity.desc&vote_count.gte=1&language=en-GB`;
   const first = await api(base + '&page=1');
   const pages = Math.min(first.total_pages, 40);
   const rest = await pool(Array.from({ length: pages - 1 }, (_, i) => i + 2), 4, (p) => api(base + '&page=' + p));
   const found = new Map();
   for (const pg of [first, ...rest]) for (const r of pg.results) found.set(r.id, r);
   const list = [...found.values()];
-  // JustWatch data lists some shows on services that never carried them (EastEnders...). Keep a show if it was made for this
-  // broadcaster, or if it belongs to none of the other platforms' broadcasters (e.g. a co-production or an ITVX exclusive).
-  await pool(list, 8, async (s) => { s.networks = ((await api(`/tv/${s.id}?language=en-GB`)).networks || []).map((n) => n.name); });
-  const others = SERVICES.filter((o) => o !== svc);
-  return list.filter((s) => s.networks.some((n) => svc.network.test(n)) || !s.networks.some((n) => others.some((o) => o.network.test(n))));
+  return list;                                             // ITVX: TMDB's UK provider list as it is
 }
 
 const sources = { bbc: scrapeBBC, ch4: scrapeC4, udave: scrapeU };
