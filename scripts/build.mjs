@@ -195,6 +195,7 @@ const nextVersion = () => {
 const manifest = {
   id: 'com.hertn.uktv', version: nextVersion(), name: "Hert's UK TV",
   description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly (last build ' + new Date().toISOString().slice(0, 10) + ').',
+  behaviorHints: { configurable: true, configurationRequired: false },
   resources: ['catalog'], types: ['series'], catalogs: manifestCatalogs, idPrefixes: ['tt'],
   logo: 'https://hertn.github.io/uk-tv-list/icon.svg', background: undefined,
 };
