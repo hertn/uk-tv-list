@@ -71,12 +71,15 @@ await pool(everything, 8, async (s) => {
 // Phase 2: every show lives on exactly one service, the one it currently streams on. A service only counts if TMDB lists the show
 // there AND one of the show's networks belongs to that broadcaster. If a show moved (QI: BBC -> Dave, Taskmaster: Dave -> Channel 4)
 // several services qualify; TMDB lists networks oldest first, so the service of the most recently added network wins.
+// TMDB's network order and lists are not reliable for a few shows that changed home, so these are pinned by hand (name -> service id).
+const PINNED = { 'Taskmaster': 'ch4', 'Taskmaster: Champion of Champions': 'ch4', 'QI': 'udave' };
 const owner = new Map(), moved = [];
 for (const s of everything) {
   const cands = s.services
     .map((svc) => ({ svc, at: Math.max(...s.networks.map((n, i) => (svc.network.test(n) ? i : -1))) }))
     .filter((c) => c.at >= 0).sort((x, y) => y.at - x.at);
-  if (cands.length) owner.set(s.id, cands[0].svc);
+  const pin = SERVICES.find((v) => v.id === PINNED[s.name] && s.services.includes(v));
+  if (pin) owner.set(s.id, pin); else if (cands.length) owner.set(s.id, cands[0].svc);
   if (cands.length > 1) moved.push(`${s.name} [${s.networks.join(' > ')}]: ${cands.map((c) => c.svc.id).join(' / ')}`);
 }
 console.log(`Shows with several candidate services (first wins):\n  ` + moved.join('\n  '));
