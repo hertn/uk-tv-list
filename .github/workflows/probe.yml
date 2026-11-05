@@ -1,0 +1,11 @@
+name: Probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15"
+          for u in https://www.itv.com/ https://www.itv.com/watch https://www.itv.com/watch/categories https://www.itv.com/watch/a-z https://www.itv.com/watch/categories/all https://www.itv.com/watch/sitemap.xml https://www.itv.com/robots.txt https://www.itv.com/sitemap.xml; do
+            echo "== $u"; curl -sL -m 30 -A "$UA" -o /tmp/o.html -w "%{http_code} %{size_download}\n" "$u"; head -c 400 /tmp/o.html | tr '\n' ' '; echo
+          done
