@@ -67,7 +67,6 @@
       "Drama",
       "Comedy",
       "Crime & Mystery",
-      "Documentary",
       "Action & Adventure",
       "Reality & Lifestyle",
       "Sci-Fi & Fantasy",
@@ -87,7 +86,6 @@
     "Drama",
     "Comedy",
     "Crime & Mystery",
-    "Documentary",
     "Action & Adventure",
     "Reality & Lifestyle",
     "Sci-Fi & Fantasy",
@@ -157,11 +155,7 @@
       "Comedy",
       "Crime & Mystery",
       "Documentary",
-      "Reality & Lifestyle",
-      "Sci-Fi & Fantasy",
-      "Soaps",
-      "Talk & Panel",
-      "War & History"
+      "Sci-Fi & Fantasy"
      ],
      "isRequired": false
     },
@@ -175,11 +169,7 @@
     "Comedy",
     "Crime & Mystery",
     "Documentary",
-    "Reality & Lifestyle",
-    "Sci-Fi & Fantasy",
-    "Soaps",
-    "Talk & Panel",
-    "War & History"
+    "Sci-Fi & Fantasy"
    ],
    "extraSupported": [
     "genre",
