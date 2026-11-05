@@ -11,10 +11,10 @@ const MIN_VOTES = 20;                // drops obscure / one-off entries
 
 // TMDB watch-provider ids for the UK (watch_region=GB)
 const SERVICES = [
-  { id: 'bbc',   name: 'BBC iPlayer',     providers: [38] },
-  { id: 'itvx',  name: 'ITVX',            providers: [41, 2300] },
-  { id: 'ch4',   name: 'Channel 4',       providers: [103] },
-  { id: 'uktv',  name: 'Dave / UKTV',     providers: [137] },
+  { id: 'bbc',   name: 'BBC iPlayer',     providers: [38],       network: /^(BBC|CBBC|CBeebies)/i },
+  { id: 'itvx',  name: 'ITVX',            providers: [41, 2300], network: /^(ITV|CITV|STV|UTV)/i },
+  { id: 'ch4',   name: 'Channel 4',       providers: [103],      network: /^(Channel 4|E4|More4|Film4|4seven|All 4|4Music)/i },
+  { id: 'uktv',  name: 'Dave / UKTV',     providers: [137],      network: /^(Dave|UKTV|U&|U ?(Dave|Gold|Yesterday|Drama|W|Alibi|Eden)|Gold|Yesterday|Drama|W$|Alibi|Eden|Really)/i },
 ];
 // TMDB TV genre id -> our friendlier category
 const CATEGORY = {
@@ -62,8 +62,14 @@ for (const svc of SERVICES) {
   // newest episode first: shows still on air come before ones that ended long ago (TMDB cannot sort discover by this, so look each one up)
   await pool(list, 8, async (s) => {
     const d = await api(`/tv/${s.id}?language=en-GB`);
+    s.networks = (d.networks || []).map((n) => n.name);
     s.latest = [d.last_episode_to_air?.air_date, d.last_air_date, d.first_air_date].filter(Boolean).sort().pop() || '';
   });
+  // JustWatch data (behind TMDB) lists shows on services that never carried them (EastEnders on Channel 4...), so only keep a
+  // show when one of its original networks belongs to this service's broadcaster. Shows with no network info are dropped too.
+  const total = list.length;
+  list.splice(0, list.length, ...list.filter((s) => s.networks.some((n) => svc.network.test(n))));
+  console.log(`${svc.name}: network check kept ${list.length} of ${total}`);
   list.sort((a, b) => (b.latest || '').localeCompare(a.latest || '') || b.popularity - a.popularity);
   const shows = list.filter((s) => s.imdb).map((s) => ({
     meta: { id: s.imdb, type: 'series', name: s.name, releaseInfo: (s.first_air_date || '').slice(0, 4), poster: `https://images.metahub.space/poster/medium/${s.imdb}/img` },
