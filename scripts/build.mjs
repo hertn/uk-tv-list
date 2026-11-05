@@ -14,7 +14,7 @@ const SERVICES = [
   { id: 'bbc',   name: 'BBC iPlayer',     providers: [38],       network: /^(BBC|CBBC|CBeebies)/i },
   { id: 'itvx',  name: 'ITVX',            providers: [41, 2300], network: /^(ITV|CITV|STV|UTV)/i },
   { id: 'ch4',   name: 'Channel 4',       providers: [103],      network: /^(Channel 4|E4|More4|Film4|4seven|All 4|4Music)/i },
-  { id: 'uktv',  name: 'Dave / UKTV',     providers: [137],      network: /^(Dave|UKTV|U&|U ?(Dave|Gold|Yesterday|Drama|W|Alibi|Eden)|Gold|Yesterday|Drama|W$|Alibi|Eden|Really)/i },
+  { id: 'udave', name: 'U&Dave',     providers: [137],      network: /^(Dave|U&|U ?(Dave|Gold|Yesterday|Drama|W|Alibi|Eden)|UKTV|Gold|Yesterday|Drama|W$|Alibi|Eden|Really)/i },
 ];
 // TMDB TV genre id -> our friendlier category
 const CATEGORY = {
@@ -49,27 +49,41 @@ const imdbOf = async (tmdbId) => {
 const write = (rel, obj) => { const f = path.join(ROOT, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(obj)); };
 fs.rmSync(path.join(ROOT, 'catalog'), { recursive: true, force: true });
 
-const manifestCatalogs = [], allGenres = new Set(), report = [];
+// Phase 1: ask TMDB which shows each service lists (JustWatch data behind it is loose: it lists EastEnders on Channel 4 and so on)
+const all = new Map();                                      // tmdb id -> show, with .services = services TMDB lists it on
 for (const svc of SERVICES) {
-  const found = new Map();
   const base = `/discover/tv?watch_region=GB&with_watch_providers=${svc.providers.join('|')}&with_origin_country=GB&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}&language=en-GB`;
   const first = await api(base + '&page=1');
   const pages = Math.min(first.total_pages, 40);
   const rest = await pool(Array.from({ length: pages - 1 }, (_, i) => i + 2), 4, (p) => api(base + '&page=' + p));
-  for (const pg of [first, ...rest]) for (const s of pg.results) if (!found.has(s.id)) found.set(s.id, s);
-  const list = [...found.values()];
-  await pool(list, 8, async (s) => { s.imdb = await imdbOf(s.id); });
-  // newest episode first: shows still on air come before ones that ended long ago (TMDB cannot sort discover by this, so look each one up)
-  await pool(list, 8, async (s) => {
-    const d = await api(`/tv/${s.id}?language=en-GB`);
-    s.networks = (d.networks || []).map((n) => n.name);
-    s.latest = [d.last_episode_to_air?.air_date, d.last_air_date, d.first_air_date].filter(Boolean).sort().pop() || '';
-  });
-  // JustWatch data (behind TMDB) lists shows on services that never carried them (EastEnders on Channel 4...), so only keep a
-  // show when one of its original networks belongs to this service's broadcaster. Shows with no network info are dropped too.
-  const total = list.length;
-  list.splice(0, list.length, ...list.filter((s) => s.networks.some((n) => svc.network.test(n))));
-  console.log(`${svc.name}: network check kept ${list.length} of ${total}`);
+  for (const pg of [first, ...rest]) for (const r of pg.results) {
+    if (!all.has(r.id)) all.set(r.id, Object.assign(r, { services: [] }));
+    all.get(r.id).services.push(svc);
+  }
+}
+const everything = [...all.values()];
+await pool(everything, 8, async (s) => { s.imdb = await imdbOf(s.id); });
+await pool(everything, 8, async (s) => {
+  const d = await api(`/tv/${s.id}?language=en-GB`);
+  s.networks = (d.networks || []).map((n) => n.name);
+  s.latest = [d.last_episode_to_air?.air_date, d.last_air_date, d.first_air_date].filter(Boolean).sort().pop() || '';
+});
+// Phase 2: every show lives on exactly one service, the one it currently streams on. A service only counts if TMDB lists the show
+// there AND one of the show's networks belongs to that broadcaster. If a show moved (QI: BBC -> Dave, Taskmaster: Dave -> Channel 4)
+// several services qualify; TMDB lists networks oldest first, so the service of the most recently added network wins.
+const owner = new Map(), moved = [];
+for (const s of everything) {
+  const cands = s.services
+    .map((svc) => ({ svc, at: Math.max(...s.networks.map((n, i) => (svc.network.test(n) ? i : -1))) }))
+    .filter((c) => c.at >= 0).sort((x, y) => y.at - x.at);
+  if (cands.length) owner.set(s.id, cands[0].svc);
+  if (cands.length > 1) moved.push(`${s.name} [${s.networks.join(' > ')}]: ${cands.map((c) => c.svc.id).join(' / ')}`);
+}
+console.log(`Shows with several candidate services (first wins):\n  ` + moved.join('\n  '));
+
+const manifestCatalogs = [], allGenres = new Set(), report = [];
+for (const svc of SERVICES) {
+  const list = everything.filter((s) => owner.get(s.id) === svc);
   list.sort((a, b) => (b.latest || '').localeCompare(a.latest || '') || b.popularity - a.popularity);
   const shows = list.filter((s) => s.imdb).map((s) => ({
     meta: { id: s.imdb, type: 'series', name: s.name, releaseInfo: (s.first_air_date || '').slice(0, 4), poster: `https://images.metahub.space/poster/medium/${s.imdb}/img` },
@@ -93,8 +107,8 @@ for (const svc of SERVICES) {
 }
 fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 0));
 const manifest = {
-  id: 'com.hertn.uktv', version: '1.0.0', name: "Hert's UK TV",
-  description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and Dave / UKTV, sorted by genre, newest episodes first. Updated weekly.',
+  id: 'com.hertn.uktv', version: '1.1.0', name: "Hert's UK TV",
+  description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly.',
   resources: ['catalog'], types: ['series'], catalogs: manifestCatalogs, idPrefixes: ['tt'],
   logo: 'https://hertn.github.io/uk-tv-list/icon.svg', background: undefined,
 };
