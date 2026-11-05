@@ -97,29 +97,32 @@ async function scrapeU() {
 }
 
 // title -> TMDB show (exact name match, most popular wins, UK-made preferred); remembered between runs
-const titleFile = path.join(ROOT, 'data/title-cache.json');
+const titleFile = path.join(ROOT, 'data/title-cache-gb.json');
 const titleCache = fs.existsSync(titleFile) ? JSON.parse(fs.readFileSync(titleFile, 'utf8')) : {};
 const norm = (t) => t.toLowerCase().replace(/&/g, 'and').replace(/^the /, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const resolveTitle = async (title) => {
   if (title in titleCache) return titleCache[title];
   const d = await api(`/search/tv?query=${encodeURIComponent(title)}&language=en-GB&include_adult=false`);
-  const hits = d.results.filter((r) => norm(r.name) === norm(title) || norm(r.original_name) === norm(title));
-  hits.sort((a, b) => (b.origin_country.includes('GB') - a.origin_country.includes('GB')) || b.popularity - a.popularity);
+  // UK-made only (American imports that the platforms carry are left out on purpose)
+  const hits = d.results.filter((r) => r.origin_country.includes('GB') && (norm(r.name) === norm(title) || norm(r.original_name) === norm(title)));
+  hits.sort((a, b) => b.popularity - a.popularity);
   const h = hits[0];
   return (titleCache[title] = h ? { id: h.id, name: h.name, first_air_date: h.first_air_date, genre_ids: h.genre_ids, popularity: h.popularity } : null);
 };
 
 async function viaTMDB(svc) {
-  const base = `/discover/tv?watch_region=GB&with_watch_providers=${svc.providers.join('|')}&with_origin_country=GB&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}&language=en-GB`;
+  const base = `/discover/tv?watch_region=GB&with_watch_providers=${svc.providers.join('|')}&with_origin_country=GB&sort_by=popularity.desc&vote_count.gte=5&language=en-GB`;
   const first = await api(base + '&page=1');
   const pages = Math.min(first.total_pages, 40);
   const rest = await pool(Array.from({ length: pages - 1 }, (_, i) => i + 2), 4, (p) => api(base + '&page=' + p));
   const found = new Map();
   for (const pg of [first, ...rest]) for (const r of pg.results) found.set(r.id, r);
   const list = [...found.values()];
-  // JustWatch data lists some shows on services that never carried them, so keep only shows made for this broadcaster
+  // JustWatch data lists some shows on services that never carried them (EastEnders...). Keep a show if it was made for this
+  // broadcaster, or if it belongs to none of the other platforms' broadcasters (e.g. a co-production or an ITVX exclusive).
   await pool(list, 8, async (s) => { s.networks = ((await api(`/tv/${s.id}?language=en-GB`)).networks || []).map((n) => n.name); });
-  return list.filter((s) => s.networks.some((n) => svc.network.test(n)));
+  const others = SERVICES.filter((o) => o !== svc);
+  return list.filter((s) => s.networks.some((n) => svc.network.test(n)) || !s.networks.some((n) => others.some((o) => o.network.test(n))));
 }
 
 const sources = { bbc: scrapeBBC, ch4: scrapeC4, udave: scrapeU };
