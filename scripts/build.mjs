@@ -49,44 +49,108 @@ const imdbOf = async (tmdbId) => {
 const write = (rel, obj) => { const f = path.join(ROOT, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(obj)); };
 fs.rmSync(path.join(ROOT, 'catalog'), { recursive: true, force: true });
 
-// Phase 1: ask TMDB which shows each service lists (JustWatch data behind it is loose: it lists EastEnders on Channel 4 and so on)
-const all = new Map();                                      // tmdb id -> show, with .services = services TMDB lists it on
-for (const svc of SERVICES) {
+// ---- Sources -------------------------------------------------------------------------------------------------------------------
+// BBC iPlayer, Channel 4 and U&Dave: read each platform's own A-Z / all-shows pages, so the list matches what the website shows.
+// ITVX: itv.com blocks scripts (bot protection), so it still comes from TMDB's UK provider data.
+const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
+const page = async (url, tries = 3) => {
+  for (let i = 0; i < tries; i++) {
+    try { const r = await fetch(url, { headers: { 'user-agent': UA, 'accept-language': 'en-GB' } }); if (r.ok) return r.text(); } catch {}
+    await new Promise((s) => setTimeout(s, 1000 * (i + 1)));
+  }
+  return null;
+};
+const unesc = (t) => t.replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
+async function scrapeBBC() {
+  const titles = new Set();
+  for (const letter of ['0-9', ...'abcdefghijklmnopqrstuvwxyz']) {
+    for (let pg = 1, total = 1; pg <= total; pg++) {
+      const html = await page(`https://www.bbc.co.uk/iplayer/a-z/${letter}?page=${pg}`);
+      const m = html && html.match(/__IPLAYER_REDUX_STATE__\s*=\s*(\{.*?\});\s*<\/script>/s);
+      if (!m) break;
+      const st = JSON.parse(m[1]); total = st.pagination?.totalPages || 1;
+      for (const e of st.programmes?.[letter]?.entities || []) if (e.props?.title) titles.add(e.props.title);
+    }
+  }
+  return [...titles];
+}
+async function scrapeC4() {
+  const titles = new Set();
+  for (let off = 0; off < 6000; off += 60) {
+    const html = await page('https://www.channel4.com/categories?offset=' + off);
+    if (!html) break;
+    let n = 0;
+    for (const m of html.matchAll(/"labelText":"((?:[^"\\]|\\.)*)","altText":"[^"]*","hrefLink":"https:[^"]*?programmes(?:\\u002F|\/)/g)) { titles.add(JSON.parse('"' + m[1] + '"')); n++; }
+    if (!n) break;
+  }
+  return [...titles].filter((t) => !/\((signed|audio described)\)/i.test(t));
+}
+async function scrapeU() {
+  const titles = new Set();
+  for (const letter of ['0-9', ...'abcdefghijklmnopqrstuvwxyz']) {
+    const html = await page('https://u.co.uk/a-z/' + letter);
+    if (!html) continue;
+    for (const m of html.matchAll(/href="\/shows\/[^"\/]+\/watch-online">([^<]+)</g)) titles.add(unesc(m[1]));
+  }
+  return [...titles];
+}
+
+// title -> TMDB show (exact name match, most popular wins, UK-made preferred); remembered between runs
+const titleFile = path.join(ROOT, 'data/title-cache.json');
+const titleCache = fs.existsSync(titleFile) ? JSON.parse(fs.readFileSync(titleFile, 'utf8')) : {};
+const norm = (t) => t.toLowerCase().replace(/&/g, 'and').replace(/^the /, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const resolveTitle = async (title) => {
+  if (title in titleCache) return titleCache[title];
+  const d = await api(`/search/tv?query=${encodeURIComponent(title)}&language=en-GB&include_adult=false`);
+  const hits = d.results.filter((r) => norm(r.name) === norm(title) || norm(r.original_name) === norm(title));
+  hits.sort((a, b) => (b.origin_country.includes('GB') - a.origin_country.includes('GB')) || b.popularity - a.popularity);
+  const h = hits[0];
+  return (titleCache[title] = h ? { id: h.id, name: h.name, first_air_date: h.first_air_date, genre_ids: h.genre_ids, popularity: h.popularity } : null);
+};
+
+async function viaTMDB(svc) {
   const base = `/discover/tv?watch_region=GB&with_watch_providers=${svc.providers.join('|')}&with_origin_country=GB&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}&language=en-GB`;
   const first = await api(base + '&page=1');
   const pages = Math.min(first.total_pages, 40);
   const rest = await pool(Array.from({ length: pages - 1 }, (_, i) => i + 2), 4, (p) => api(base + '&page=' + p));
-  for (const pg of [first, ...rest]) for (const r of pg.results) {
-    if (!all.has(r.id)) all.set(r.id, Object.assign(r, { services: [] }));
-    all.get(r.id).services.push(svc);
-  }
+  const found = new Map();
+  for (const pg of [first, ...rest]) for (const r of pg.results) found.set(r.id, r);
+  const list = [...found.values()];
+  // JustWatch data lists some shows on services that never carried them, so keep only shows made for this broadcaster
+  await pool(list, 8, async (s) => { s.networks = ((await api(`/tv/${s.id}?language=en-GB`)).networks || []).map((n) => n.name); });
+  return list.filter((s) => s.networks.some((n) => svc.network.test(n)));
 }
-const everything = [...all.values()];
+
+const sources = { bbc: scrapeBBC, ch4: scrapeC4, udave: scrapeU };
+const perService = {};
+for (const svc of SERVICES) {
+  let shows;
+  if (sources[svc.id]) {
+    const titles = await sources[svc.id]();
+    console.log(`${svc.name}: ${titles.length} titles on the website`);
+    if (titles.length < 50) throw new Error(`${svc.name}: only ${titles.length} titles scraped, the site layout probably changed`);
+    const hits = await pool(titles, 8, resolveTitle);
+    const byId = new Map(); hits.filter(Boolean).forEach((h) => byId.set(h.id, h));
+    shows = [...byId.values()];
+    console.log(`${svc.name}: ${shows.length} matched to TMDB; unmatched e.g. ${titles.filter((t, i) => !hits[i]).slice(0, 8).join(' | ')}`);
+  } else shows = await viaTMDB(svc);
+  perService[svc.id] = shows;
+}
+fs.writeFileSync(titleFile, JSON.stringify(titleCache));
+const canon = new Map();                                    // one object per show, shared by every service it is on
+for (const id of Object.keys(perService)) perService[id] = perService[id].map((s) => { if (!canon.has(s.id)) canon.set(s.id, s); return canon.get(s.id); });
+const everything = [...canon.values()];
 await pool(everything, 8, async (s) => { s.imdb = await imdbOf(s.id); });
+// newest episode first: shows still on air come before ones that ended long ago
 await pool(everything, 8, async (s) => {
   const d = await api(`/tv/${s.id}?language=en-GB`);
-  s.networks = (d.networks || []).map((n) => n.name);
   s.latest = [d.last_episode_to_air?.air_date, d.last_air_date, d.first_air_date].filter(Boolean).sort().pop() || '';
 });
-// Phase 2: every show lives on exactly one service, the one it currently streams on. A service only counts if TMDB lists the show
-// there AND one of the show's networks belongs to that broadcaster. If a show moved (QI: BBC -> Dave, Taskmaster: Dave -> Channel 4)
-// several services qualify; TMDB lists networks oldest first, so the service of the most recently added network wins.
-// TMDB's network order and lists are not reliable for a few shows that changed home, so these are pinned by hand (name -> service id).
-const PINNED = { 'Taskmaster': 'ch4', 'Taskmaster: Champion of Champions': 'ch4', 'QI': 'udave' };
-const owner = new Map(), moved = [];
-for (const s of everything) {
-  const cands = s.services
-    .map((svc) => ({ svc, at: Math.max(...s.networks.map((n, i) => (svc.network.test(n) ? i : -1))) }))
-    .filter((c) => c.at >= 0).sort((x, y) => y.at - x.at);
-  const pin = SERVICES.find((v) => v.id === PINNED[s.name] && s.services.includes(v));
-  if (pin) owner.set(s.id, pin); else if (cands.length) owner.set(s.id, cands[0].svc);
-  if (cands.length > 1) moved.push(`${s.name} [${s.networks.join(' > ')}]: ${cands.map((c) => c.svc.id).join(' / ')}`);
-}
-console.log(`Shows with several candidate services (first wins):\n  ` + moved.join('\n  '));
 
 const manifestCatalogs = [], allGenres = new Set(), report = [];
 for (const svc of SERVICES) {
-  const list = everything.filter((s) => owner.get(s.id) === svc);
+  const list = perService[svc.id];
   list.sort((a, b) => (b.latest || '').localeCompare(a.latest || '') || b.popularity - a.popularity);
   const shows = list.filter((s) => s.imdb).map((s) => ({
     meta: { id: s.imdb, type: 'series', name: s.name, releaseInfo: (s.first_air_date || '').slice(0, 4), poster: `https://images.metahub.space/poster/medium/${s.imdb}/img` },
@@ -110,7 +174,7 @@ for (const svc of SERVICES) {
 }
 fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 0));
 const manifest = {
-  id: 'com.hertn.uktv', version: '1.1.0', name: "Hert's UK TV",
+  id: 'com.hertn.uktv', version: '1.2.0', name: "Hert's UK TV",
   description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly.',
   resources: ['catalog'], types: ['series'], catalogs: manifestCatalogs, idPrefixes: ['tt'],
   logo: 'https://hertn.github.io/uk-tv-list/icon.svg', background: undefined,
