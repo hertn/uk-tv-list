@@ -180,7 +180,7 @@ for (const svc of SERVICES) {
 }
 fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 0));
 const manifest = {
-  id: 'com.hertn.uktv', version: '1.2.0', name: "Hert's UK TV",
+  id: 'com.hertn.uktv', version: `1.3.${Math.floor(Date.now() / 864e5)}`, name: "Hert's UK TV",
   description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly.',
   resources: ['catalog'], types: ['series'], catalogs: manifestCatalogs, idPrefixes: ['tt'],
   logo: 'https://hertn.github.io/uk-tv-list/icon.svg', background: undefined,
