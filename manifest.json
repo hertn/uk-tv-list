@@ -1,6 +1,6 @@
 {
  "id": "com.hertn.uktv",
- "version": "1.1.0",
+ "version": "1.2.0",
  "name": "Hert's UK TV",
  "description": "UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly.",
  "resources": [
@@ -151,12 +151,17 @@
     {
      "name": "genre",
      "options": [
+      "Kids & Animation",
       "Drama",
       "Comedy",
       "Crime & Mystery",
       "Documentary",
+      "Action & Adventure",
+      "Reality & Lifestyle",
       "Sci-Fi & Fantasy",
-      "Talk & Panel"
+      "Soaps",
+      "Talk & Panel",
+      "War & History"
      ],
      "isRequired": false
     },
@@ -166,12 +171,17 @@
     }
    ],
    "genres": [
+    "Kids & Animation",
     "Drama",
     "Comedy",
     "Crime & Mystery",
     "Documentary",
+    "Action & Adventure",
+    "Reality & Lifestyle",
     "Sci-Fi & Fantasy",
-    "Talk & Panel"
+    "Soaps",
+    "Talk & Panel",
+    "War & History"
    ],
    "extraSupported": [
     "genre",
