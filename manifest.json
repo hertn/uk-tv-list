@@ -155,7 +155,8 @@
       "Comedy",
       "Crime & Mystery",
       "Documentary",
-      "Sci-Fi & Fantasy"
+      "Sci-Fi & Fantasy",
+      "Talk & Panel"
      ],
      "isRequired": false
     },
@@ -169,7 +170,8 @@
     "Comedy",
     "Crime & Mystery",
     "Documentary",
-    "Sci-Fi & Fantasy"
+    "Sci-Fi & Fantasy",
+    "Talk & Panel"
    ],
    "extraSupported": [
     "genre",
