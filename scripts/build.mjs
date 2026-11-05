@@ -179,8 +179,13 @@ for (const svc of SERVICES) {
   report.push(`${svc.name}: ${shows.length} shows (${list.length - shows.length} without an IMDb id skipped)`);
 }
 fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 0));
+// 1.2.x: the patch number goes up by one on every build, so Stremio never keeps serving a cached manifest
+const nextVersion = () => {
+  try { const [a, b, c] = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8')).version.split('.').map(Number); if (a === 1 && b === 2) return `1.2.${c + 1}`; } catch {}
+  return '1.2.1';
+};
 const manifest = {
-  id: 'com.hertn.uktv', version: `1.3.${Math.floor(Date.now() / 864e5)}`, name: "Hert's UK TV",
+  id: 'com.hertn.uktv', version: nextVersion(), name: "Hert's UK TV",
   description: 'UK-made shows streaming right now on BBC iPlayer, ITVX, Channel 4 and U&Dave, sorted by genre, newest episodes first. Updated weekly.',
   resources: ['catalog'], types: ['series'], catalogs: manifestCatalogs, idPrefixes: ['tt'],
   logo: 'https://hertn.github.io/uk-tv-list/icon.svg', background: undefined,
