@@ -30,6 +30,7 @@ const api = async (url, tries = 4) => {
   for (let i = 0; i < tries; i++) {
     const r = await fetch('https://api.themoviedb.org/3' + url, { headers: { Authorization: 'Bearer ' + TOKEN, accept: 'application/json' } });
     if (r.ok) return r.json();
+    if (r.status === 404) return null;                       // show deleted/merged on TMDB since we cached its id
     if (r.status === 429 || r.status >= 500) { await new Promise((s) => setTimeout(s, 1000 * (i + 1))); continue; }
     throw new Error(`TMDB ${r.status} for ${url.replace(/\?.*/, '')}`);
   }
@@ -43,6 +44,7 @@ const cache = fs.existsSync(cacheFile) ? JSON.parse(fs.readFileSync(cacheFile, '
 const imdbOf = async (tmdbId) => {
   if (tmdbId in cache) return cache[tmdbId];
   const d = await api(`/tv/${tmdbId}/external_ids`);
+  if (!d) return null;
   return (cache[tmdbId] = d.imdb_id || null);
 };
 
@@ -143,7 +145,6 @@ for (const svc of SERVICES) {
   }
   perService[svc.id] = shows;
 }
-fs.writeFileSync(titleFile, JSON.stringify(titleCache));
 const canon = new Map();                                    // one object per show, shared by every service it is on
 for (const id of Object.keys(perService)) perService[id] = perService[id].map((s) => { if (!canon.has(s.id)) canon.set(s.id, s); return canon.get(s.id); });
 const everything = [...canon.values()];
@@ -151,8 +152,15 @@ await pool(everything, 8, async (s) => { s.imdb = await imdbOf(s.id); });
 // newest episode first: shows still on air come before ones that ended long ago
 await pool(everything, 8, async (s) => {
   const d = await api(`/tv/${s.id}?language=en-GB`);
+  if (!d) {                                                // gone from TMDB: drop it now, re-search the title next run
+    console.log(`TMDB: show ${s.id} "${s.name}" no longer exists, skipped`);
+    s.imdb = null;
+    for (const t in titleCache) if (titleCache[t]?.id === s.id) delete titleCache[t];
+    return;
+  }
   s.latest = [d.last_episode_to_air?.air_date, d.last_air_date, d.first_air_date].filter(Boolean).sort().pop() || '';
 });
+fs.writeFileSync(titleFile, JSON.stringify(titleCache));
 
 // TMDB tags many shows with several genres (Jonathan Creek: Comedy + Crime + Drama). Keep the most specific ones so a detective show
 // is not listed under Comedy: Drama is only used when nothing else fits, and Comedy steps aside for Crime & Mystery.
