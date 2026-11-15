@@ -89,9 +89,14 @@ h2{font-size:1.5rem;margin:0 0 16px;letter-spacing:-.01em}
 .others a{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;text-decoration:none;background:var(--fill)}
 .others a:hover{background:var(--fill-2)}
 footer.wrap{border-top:1px solid var(--line);margin-top:40px;padding-top:28px;padding-bottom:44px;color:var(--text-3);font-size:.9rem;text-align:center}
+.hub{padding-top:16px}
+.hub a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;background:var(--fill);text-decoration:none;font-weight:600;font-size:.95rem;color:inherit;opacity:.85}
+.hub a:hover{background:var(--fill-2);opacity:1}
+.hub a:focus-visible{outline:3px solid currentColor;outline-offset:3px}
 </style>
 </head>
 <body>
+<nav class="hub wrap" aria-label="More by hertn"><a href="https://hertn.github.io/"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg> All projects by hertn</a></nav>
 <main>
   <header class="hero wrap">
     <img src="icon.svg" width="88" height="88" alt="">
@@ -123,7 +128,7 @@ footer.wrap{border-top:1px solid var(--line);margin-top:40px;padding-top:28px;pa
 (async () => {
   const box = document.getElementById('list');
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const getJSON = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status + ' ' + u); return r.json(); };
+  const getJSON = async u => { const r = await fetch((location.protocol === 'file:' ? 'https://hertn.github.io/uk-tv-list/' : '') + u);   // opened from disk: read the live list if (!r.ok) throw new Error(r.status + ' ' + u); return r.json(); };
   const tiles = metas => metas.map(m => `<li><a href="https://web.stremio.com/#/detail/${esc(m.type)}/${esc(m.id)}"><img src="${esc(m.poster || '')}" alt="" loading="lazy" width="132" height="198"><span>${esc(m.name)} <small>${esc(m.releaseInfo || '')}</small></span></a></li>`).join('');
   const genresOf = c => (c.extra || []).find(e => e.name === 'genre')?.options || c.genres || [];
   const genreUrl = (c, g) => `catalog/${c.type}/${c.id}/genre=${encodeURIComponent(g)}.json`;
